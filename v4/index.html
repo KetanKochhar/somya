@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sacred Journey: Basic Movement</title>
+    <!-- Tailwind CSS for general page styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Custom CSS for the game and overall layout */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll */
+            padding: 20px; /* Add some padding for smaller screens */
+            box-sizing: border-box;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+            max-width: 900px; /* Max width for the container */
+            width: 100%;
+        }
+        canvas {
+            background-color: #e0e7ee; /* Slightly darker blue-gray for ground */
+            border: 4px solid #6b7280; /* Gray border */
+            border-radius: 12px;
+            display: block;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            touch-action: none; /* Disable default touch actions like scrolling/zooming */
+            width: 100%; /* Make canvas responsive within its container */
+            max-width: 800px; /* Max width for the canvas */
+            height: auto; /* Maintain aspect ratio */
+            aspect-ratio: 4 / 3; /* Example aspect ratio */
+        }
+        .controls-info {
+            background-color: #f8fafc;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            color: #334155;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 700px;
+        }
+        .controls-info kbd {
+            display: inline-block;
+            padding: 3px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background-color: #f1f5f9;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #475569;
+            margin: 0 2px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 700px;
+        }
+        .game-button {
+            background-color: #4f46e5; /* Indigo */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 100px;
+        }
+        .game-button:hover {
+            background-color: #4338ca; /* Darker indigo */
+            transform: translateY(-2px);
+        }
+        .game-button:active {
+            background-color: #3730a3; /* Even darker indigo */
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .game-button.disabled {
+            background-color: #9ca3af; /* Gray */
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Basic message box styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.2rem;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .message-box.show {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Sacred Journey: Basic Movement</h1>
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls-info">
+            <p>Use <kbd>A</kbd> / <kbd>D</kbd> or <kbd>←</kbd> / <kbd>→</kbd> to Walk/Run (<kbd>Shift</kbd> for Run).</p>
+            <p>Press <kbd>Space</kbd> to Jump. Double Jump unlocks after first jump.</p>
+            <p>Hold <kbd>S</kbd> or <kbd>↓</kbd> to Crouch/Crawl.</p>
+            <p>Move towards ladders/ledges to Climb/Grab.</p>
+        </div>
+        <div class="button-group">
+            <button id="leftBtn" class="game-button">← Walk</button>
+            <button id="rightBtn" class="game-button">Walk →</button>
+            <button id="jumpBtn" class="game-button">Jump</button>
+            <button id="crouchBtn" class="game-button">Crouch</button>
+        </div>
+    </div>
+
+    <!-- Message Box for alerts -->
+    <div id="messageBox" class="message-box"></div>
+
+    <script>
+        // Get canvas and its 2D rendering context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('messageBox');
+
+        // Game Constants
+        const GRAVITY = 0.5;
+        const WALK_SPEED = 3;
+        const RUN_SPEED = 6;
+        const JUMP_STRENGTH = -10;
+        const LADDER_SPEED = 3;
+        const PLAYER_WIDTH = 40;
+        const PLAYER_HEIGHT = 80;
+        const CROUCH_HEIGHT = 40; // Height when crouching
+        const LEDGE_CLIMB_SPEED = 5; // Speed for ledge climbing animation
+
+        // Set canvas size dynamically and on resize
+        const setCanvasSize = () => {
+            // Set a maximum width for the canvas to maintain readability and performance
+            const maxWidth = 800;
+            const maxHeight = 600;
+            
+            // Calculate current available width and height for the canvas
+            const containerWidth = canvas.parentElement.clientWidth - 40; // Account for container padding
+            const containerHeight = canvas.parentElement.clientHeight - 100; // Estimate space for controls
+
+            // Determine actual canvas width and height, respecting max values and aspect ratio
+            let newWidth = Math.min(containerWidth, maxWidth);
+            let newHeight = (newWidth / 4) * 3; // Maintain 4:3 aspect ratio
+
+            if (newHeight > maxHeight) {
+                newHeight = maxHeight;
+                newWidth = (newHeight / 3) * 4;
+            }
+
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+
+            // Adjust player initial position based on new canvas height
+            player.y = canvas.height - PLAYER_HEIGHT - 50;
+            // Re-initialize platforms if they depend on canvas dimensions
+            initLevelElements();
+        };
+
+        // Player Object
+        const player = {
+            x: 50,
+            y: 0, // Will be set by setCanvasSize
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT,
+            dx: 0, // Horizontal velocity
+            dy: 0, // Vertical velocity
+            onGround: false,
+            jumpCount: 0, // Tracks number of jumps in current airtime
+            canDoubleJump: false, // Becomes true after the first jump
+            isCrouching: false,
+            isClimbing: false,
+            isGrabbingLedge: false,
+            isWalking: false,
+            isRunning: false,
+            direction: 1, // 1 for right, -1 for left
+            afterImages: [], // Stores past positions for running trail VFX
+            footRipples: [], // Stores ripple objects for walking VFX
+            mandala: { active: false, opacity: 0, size: 0 }, // For double jump VFX
+            handsGlow: false, // For climbing VFX
+            climbTargetY: null, // For smooth ledge climbing animation
+            currentLadder: null, // Reference to the ladder player is on
+            climbProgress: 0 // For smooth ledge grab animation
+        };
+
+        // Level Elements (initialized based on canvas size)
+        let platforms = [];
+        let ladders = [];
+        let crawlSpaces = [];
+        let ledges = [];
+
+        // Function to initialize/re-initialize level elements based on canvas size
+        const initLevelElements = () => {
+            platforms = [
+                // Ground platform
+                { x: 0, y: canvas.height - 50, width: canvas.width, height: 50, type: 'ground' },
+                // Lower platform
+                { x: canvas.width * 0.2, y: canvas.height - 200, width: canvas.width * 0.25, height: 20, type: 'platform' },
+                // Upper platform (with ledge on right)
+                { x: canvas.width * 0.6, y: canvas.height - 350, width: canvas.width * 0.35, height: 20, type: 'platform' },
+            ];
+
+            ladders = [
+                // Ladder to lower platform
+                { x: canvas.width * 0.3, y: canvas.height - 200, width: 30, height: 150 },
+                // Ladder to upper platform
+                { x: canvas.width * 0.7, y: canvas.height - 350, width: 30, height: 200 },
+            ];
+
+            crawlSpaces = [
+                // Crawl tunnel
+                { x: canvas.width * 0.45, y: canvas.height - 100, width: canvas.width * 0.15, height: 50, entranceHeight: 80 },
+            ];
+
+            ledges = [
+                // Ledge on the upper platform
+                { x: platforms[2].x + platforms[2].width - 10, y: platforms[2].y - 20, width: 10, height: 40, climbHeight: PLAYER_HEIGHT },
+            ];
+        };
+
+        // Initialize canvas and level elements on load
+        setCanvasSize();
+        window.addEventListener('resize', setCanvasSize);
+
+        // Input State
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            // Prevent default scroll behavior for spacebar and arrow keys
+            if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+            }
+            startAudioContext(); // Start audio context on first key press
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+            // Stop cloth/bell sounds when crouch key is released
+            if (e.key === 's' || e.key === 'ArrowDown') {
+                clothSound.triggerRelease();
+                smallBellSound.triggerRelease();
+            }
+        });
+
+        // Touch Controls
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const jumpBtn = document.getElementById('jumpBtn');
+        const crouchBtn = document.getElementById('crouchBtn');
+
+        const setupButtonListeners = (button, keyName) => {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keys[keyName] = true;
+                startAudioContext(); // Start audio context on first touch
+            }, { passive: false });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+                if (keyName === 's' || keyName === 'ArrowDown') {
+                    clothSound.triggerRelease();
+                    smallBellSound.triggerRelease();
+                }
+            }, { passive: false });
+        };
+
+        setupButtonListeners(leftBtn, 'a');
+        setupButtonListeners(rightBtn, 'd');
+        setupButtonListeners(jumpBtn, ' ');
+        setupButtonListeners(crouchBtn, 's');
+
+        // --- Sound Effects (Tone.js) ---
+        let audioContextStarted = false;
+        const startAudioContext = () => {
+            if (!audioContextStarted) {
+                Tone.start().then(() => {
+                    audioContextStarted = true;
+                    console.log('AudioContext started');
+                }).catch(e => {
+                    console.error('Failed to start AudioContext:', e);
+                    showMessage('Audio failed to start. Please allow audio playback.', 3000);
+                });
+            }
+        };
+
+        // Wind Chime (Jump Take-off)
+        const windChimeSynth = new Tone.PolySynth(Tone.Synth, { // Changed to Tone.Synth
+            // Options for Synth voice
+            voice: { 
+                oscillator: { type: "sine" }, // Use sine wave for a softer, chime-like sound
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.5,
+                    sustain: 0.0,
+                    release: 0.5,
+                },
+            }
+        }).toDestination();
+
+        // Prayer Bell (Landing)
+        const prayerBellSynth = new Tone.MetalSynth({
+            frequency: 100,
+            envelope: {
+                attack: 0.001,
+                decay: 0.4,
+                release: 0.1
+            },
+            harmonicity: 5.1,
+            modulationIndex: 32,
+            resonance: 4000,
+            octaves: 1.5
+        }).toDestination();
+
+        // Cloth Sound (Crouch/Crawl) - subtle noise
+        const clothSound = new Tone.NoiseSynth({
+            noise: { type: 'pink' },
+            envelope: {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.05,
+                release: 0.1
+            }
+        }).toDestination();
+
+        // Small Bell Sound (Crouch/Crawl) - very subtle
+        const smallBellSound = new Tone.MetalSynth({
+            frequency: 200,
+            envelope: {
+                attack: 0.001,
+                decay: 0.05,
+                release: 0.05
+            },
+            harmonicity: 3.1,
+            modulationIndex: 10,
+            resonance: 2000,
+            octaves: 0.5
+        }).toDestination();
+
+        // Function to play sounds
+        const playWindChime = () => { if (audioContextStarted) windChimeSynth.triggerAttackRelease(["C4", "E4", "G4"], "8n"); };
+        const playPrayerBell = () => { if (audioContextStarted) prayerBellSynth.triggerAttackRelease("C3", "4n"); };
+        const playClothAndBell = () => {
+            if (audioContextStarted && Tone.context.state === 'running') {
+                clothSound.triggerAttackRelease("8n");
+                smallBellSound.triggerAttackRelease("C5", "16n");
+            }
+        };
+
+        // Custom message box function
+        function showMessage(msg, duration = 2000) {
+            messageBox.textContent = msg;
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        // --- Game Logic Functions ---
+
+        function update() {
+            // Reset states
+            player.isWalking = false;
+            player.isRunning = false;
+            player.handsGlow = false; // Reset hand glow for climbing
+
+            // Handle Ledge Climbing Animation
+            if (player.climbTargetY !== null) {
+                player.isGrabbingLedge = true;
+                player.handsGlow = true;
+                if (player.y > player.climbTargetY) {
+                    player.y -= LEDGE_CLIMB_SPEED;
+                    player.dy = 0; // Stop gravity during climb animation
+                } else {
+                    player.y = player.climbTargetY;
+                    player.climbTargetY = null;
+                    player.isGrabbingLedge = false;
+                    player.onGround = true; // Landed on top of ledge
+                    player.jumpCount = 0; // Reset jump count
+                    playPrayerBell(); // Play landing sound
+                }
+                // Skip other movement logic while climbing animation is active
+                return;
+            }
+
+            // Handle Horizontal Movement
+            player.dx = 0; // Reset horizontal velocity
+            if (!player.isClimbing) { // Cannot move horizontally while climbing ladders
+                if (keys['a'] || keys['ArrowLeft']) {
+                    player.dx = -(keys['Shift'] ? RUN_SPEED : WALK_SPEED);
+                    player.direction = -1;
+                    player.isWalking = true;
+                    player.isRunning = keys['Shift'];
+                }
+                if (keys['d'] || keys['ArrowRight']) {
+                    player.dx = (keys['Shift'] ? RUN_SPEED : WALK_SPEED);
+                    player.direction = 1;
+                    player.isWalking = true;
+                    player.isRunning = keys['Shift'];
+                }
+            }
+
+            // Debugging log (uncomment to see values in console)
+            // console.log(`Shift: ${keys['Shift']}, isRunning: ${player.isRunning}, dx: ${player.dx}`);
+
+
+            // Update after-images for running VFX
+            if (player.isRunning && player.onGround) { // Only create after-images when running on ground
+                player.afterImages.push({
+                    x: player.x,
+                    y: player.y,
+                    width: player.width,
+                    height: player.height,
+                    opacity: 0.7, // Increased initial opacity
+                    color: 'rgba(79, 70, 229, 1)' // Solid indigo color, opacity handled by 'opacity' property
+                });
+            }
+            // Limit after-images to prevent performance issues and fade them out
+            while (player.afterImages.length > 8) { // More after-images
+                player.afterImages.shift();
+            }
+            player.afterImages.forEach(img => img.opacity -= 0.015); // Slightly slower fade
+            player.afterImages = player.afterImages.filter(img => img.opacity > 0);
+
+            // Update foot ripples for walking VFX
+            if (player.isWalking && player.onGround && Math.random() < 0.2) { // Random chance for ripple
+                player.footRipples.push({
+                    x: player.x + player.width / 2,
+                    y: player.y + player.height,
+                    radius: 5,
+                    opacity: 0.8,
+                    color: 'rgba(255, 255, 255, 0.8)' // Light ripple
+                });
+            }
+            player.footRipples.forEach(ripple => {
+                ripple.radius += 1;
+                ripple.opacity -= 0.03;
+            });
+            player.footRipples = player.footRipples.filter(ripple => ripple.opacity > 0 && ripple.radius < 30);
+
+
+            // Handle Crouch/Crawl
+            const targetHeight = (keys['s'] || keys['ArrowDown']) ? CROUCH_HEIGHT : PLAYER_HEIGHT;
+            player.isCrouching = (targetHeight === CROUCH_HEIGHT);
+
+            if (player.isCrouching && !player.isClimbing && (player.dx !== 0 || player.dy !== 0)) {
+                // Play subtle cloth and bell sounds only when crouching and moving
+                if (audioContextStarted && Tone.context.state === 'running' && !clothSound.context._isActive) {
+                    clothSound.triggerAttackRelease("8n"); // Play for a short duration
+                    smallBellSound.triggerAttackRelease("C5", "16n");
+                }
+            } else {
+                // Stop sounds if not crouching or not moving
+                if (clothSound.context._isActive) { // Check if sound is currently playing
+                    clothSound.triggerRelease();
+                    smallBellSound.triggerRelease();
+                }
+            }
+
+            // Smoothly adjust player height
+            if (player.height !== targetHeight) {
+                if (player.height < targetHeight) {
+                    player.height = Math.min(player.height + 5, targetHeight);
+                } else {
+                    // Check if player can stand up (no ceiling above)
+                    let canStandUp = true;
+                    for (const p of platforms) {
+                        if (player.x < p.x + p.width &&
+                            player.x + player.width > p.x &&
+                            player.y + CROUCH_HEIGHT > p.y &&
+                            player.y < p.y + p.height) {
+                            canStandUp = false;
+                            break;
+                        }
+                    }
+                    if (canStandUp) { 
+                        player.height = Math.max(player.height - 5, targetHeight);
+                        // Adjust player y to keep feet on ground when standing up
+                        if (player.onGround) player.y -= (PLAYER_HEIGHT - player.height);
+                    } else {
+                        player.isCrouching = true; // Force crouch if cannot stand
+                        player.height = CROUCH_HEIGHT;
+                    }
+                }
+            }
+
+            // Handle Climbing
+            let onLadder = false;
+            for (const ladder of ladders) {
+                if (player.x + player.width > ladder.x &&
+                    player.x < ladder.x + ladder.width &&
+                    player.y + player.height > ladder.y &&
+                    player.y < ladder.y + ladder.height) {
+                    onLadder = true;
+                    player.currentLadder = ladder;
+                    break;
+                }
+            }
+
+            if (onLadder && (keys['w'] || keys['ArrowUp'] || keys['s'] || keys['ArrowDown'])) {
+                player.isClimbing = true;
+                player.onGround = false; // Can't be on ground while climbing
+                player.dy = 0; // No gravity while climbing
+                player.dx = 0; // No horizontal movement while climbing
+                player.handsGlow = true; // Hands glow when climbing
+
+                if (keys['w'] || keys['ArrowUp']) {
+                    player.y -= LADDER_SPEED;
+                }
+                if (keys['s'] || keys['ArrowDown']) {
+                    player.y += LADDER_SPEED;
+                }
+                // Keep player centered on ladder (optional, but good for feel)
+                player.x = player.currentLadder.x + (player.currentLadder.width / 2) - (player.width / 2);
+
+            } else {
+                player.isClimbing = false;
+                player.currentLadder = null;
+            }
+
+            // Apply Gravity if not climbing or grabbing ledge
+            if (!player.isClimbing && !player.isGrabbingLedge) {
+                player.dy += GRAVITY;
+            }
+
+            // Handle Jump
+            if ((keys[' '] || jumpBtn.classList.contains('active')) && !player.isGrabbingLedge) {
+                if (player.onGround && player.jumpCount === 0) {
+                    player.dy = JUMP_STRENGTH;
+                    player.onGround = false;
+                    player.jumpCount = 1;
+                    player.canDoubleJump = true; // Unlock double jump after first jump
+                    playWindChime(); // Soft wind chime sound
+                } else if (!player.onGround && player.jumpCount === 1 && player.canDoubleJump) {
+                    player.dy = JUMP_STRENGTH * 0.8; // Slightly weaker double jump
+                    player.jumpCount = 2;
+                    player.canDoubleJump = false; // Used double jump
+                    playWindChime(); // Soft wind chime sound
+                    // Activate mandala pattern VFX
+                    player.mandala = { active: true, opacity: 1, size: 0 };
+                }
+            }
+
+            // Update Mandala VFX
+            if (player.mandala.active) {
+                player.mandala.size += 2;
+                player.mandala.opacity -= 0.02;
+                if (player.mandala.opacity <= 0) {
+                    player.mandala.active = false;
+                    player.mandala.size = 0;
+                }
+            }
+
+            // Update player position based on velocity
+            player.x += player.dx;
+            player.y += player.dy;
+
+            // Collision Detection with Platforms
+            player.onGround = false;
+            for (const p of platforms) {
+                // Check for collision with platform
+                if (player.x < p.x + p.width &&
+                    player.x + player.width > p.x &&
+                    player.y + player.height > p.y &&
+                    player.y < p.y + p.height) {
+
+                    // If falling and landed on top of a platform
+                    if (player.dy > 0 && player.y + player.height - player.dy <= p.y) {
+                        player.y = p.y - player.height;
+                        player.dy = 0;
+                        if (!player.onGround) { // Only play sound if just landed
+                            playPrayerBell(); // Prayer bell echo at landing
+                        }
+                        player.onGround = true;
+                        player.jumpCount = 0; // Reset jump count on landing
+                    }
+                    // If hitting bottom of platform while jumping
+                    else if (player.dy < 0 && player.y >= p.y + p.height - player.dy) {
+                        player.y = p.y + p.height;
+                        player.dy = 0; // Stop upward movement
+                    }
+                }
+            }
+
+            // Collision with Crawl Spaces
+            let inCrawlSpace = false;
+            for (const cs of crawlSpaces) {
+                if (player.x < cs.x + cs.width &&
+                    player.x + player.width > cs.x &&
+                    player.y + player.height > cs.y &&
+                    player.y < cs.y + cs.height) {
+                    inCrawlSpace = true;
+                    // If player is too tall to be in crawl space
+                    if (player.height > cs.entranceHeight) {
+                        // Force player to crouch or prevent entry
+                        if (!player.isCrouching) {
+                            // If player tries to enter without crouching, prevent movement
+                            if (player.dx > 0 && player.x + player.width > cs.x && player.x < cs.x) player.x = cs.x - player.width;
+                            if (player.dx < 0 && player.x < cs.x + cs.width && player.x + player.width > cs.x + cs.width) player.x = cs.x + cs.width;
+                        }
+                    }
+                }
+            }
+
+            // Handle Ledge Grabbing
+            let nearLedge = false;
+            for (const ledge of ledges) {
+                // Check if player is near the ledge horizontally and slightly below it vertically
+                if ((player.direction === 1 && player.x + player.width > ledge.x && player.x < ledge.x + ledge.width &&
+                     player.y + player.height > ledge.y && player.y + player.height < ledge.y + ledge.height + player.height / 2) ||
+                    (player.direction === -1 && player.x < ledge.x + ledge.width && player.x + player.width > ledge.x &&
+                     player.y + player.height > ledge.y && player.y + player.height < ledge.y + ledge.height + player.height / 2)) {
+                    
+                    // Check if player is jumping or falling towards the ledge
+                    if (!player.onGround && player.dy > 0) {
+                        nearLedge = true;
+                        player.isGrabbingLedge = true;
+                        player.handsGlow = true; // Hands glow faintly with relic energy
+                        player.dy = 0; // Stop vertical movement
+                        player.dx = 0; // Stop horizontal movement
+                        player.x = ledge.x + (player.direction === 1 ? -player.width : ledge.width); // Snap to ledge side
+                        player.y = ledge.y + ledge.height - player.height; // Snap player's top to ledge bottom
+
+                        // Trigger climb animation if jump/up key is pressed
+                        if (keys[' '] || keys['w'] || keys['ArrowUp']) {
+                            player.climbTargetY = ledge.y - player.height; // Target Y to stand on top of ledge
+                            player.isGrabbingLedge = false; // End grab state, start climb animation
+                        }
+                        break; // Only grab one ledge at a time
+                    }
+                }
+            }
+            if (!nearLedge && player.climbTargetY === null) {
+                player.isGrabbingLedge = false;
+            }
+
+
+            // Boundary Checks
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            if (player.y < 0) {
+                player.y = 0;
+                player.dy = 0; // Prevent going through the top
+            }
+            // Player should not fall below ground (handled by platform collision, but as a fallback)
+            if (player.y + player.height > canvas.height) {
+                player.y = canvas.height - player.height;
+                player.dy = 0;
+                if (!player.onGround) {
+                    playPrayerBell();
+                }
+                player.onGround = true;
+                player.jumpCount = 0;
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            // Draw Level Elements
+            ctx.fillStyle = '#6c7a89'; // Darker blue-gray for platforms
+            platforms.forEach(p => {
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+            });
+
+            ctx.fillStyle = '#aab8c2'; // Light gray for ladder
+            ladders.forEach(l => {
+                ctx.fillRect(l.x, l.y, l.width, l.height);
+                // Draw ladder rungs
+                ctx.strokeStyle = '#8899a6';
+                ctx.lineWidth = 2;
+                const rungSpacing = 20;
+                for (let y = l.y + rungSpacing; y < l.y + l.height - rungSpacing / 2; y += rungSpacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(l.x + 5, y);
+                    ctx.lineTo(l.x + l.width - 5, y);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.fillStyle = '#8899a6'; // Gray for crawl space
+            crawlSpaces.forEach(cs => {
+                ctx.fillRect(cs.x, cs.y + cs.entranceHeight, cs.width, cs.height - cs.entranceHeight); // Draw the solid part
+                ctx.strokeStyle = '#6c7a89';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cs.x, cs.y, cs.width, cs.height); // Outline the whole area
+                ctx.fillText("Crawl", cs.x + cs.width / 2 - 20, cs.y + cs.entranceHeight / 2); // Text hint
+            });
+
+            ctx.fillStyle = '#6c7a89'; // Darker blue-gray for ledges
+            ledges.forEach(l => {
+                ctx.fillRect(l.x, l.y, l.width, l.height);
+            });
+
+
+            // Draw Running After-images (VFX)
+            player.afterImages.forEach(img => {
+                ctx.fillStyle = `rgba(79, 70, 229, ${img.opacity})`; // Faint indigo
+                ctx.fillRect(img.x, img.y, img.width, img.height);
+            });
+
+            // Draw Walking Foot Ripples (VFX)
+            player.footRipples.forEach(ripple => {
+                ctx.strokeStyle = `rgba(255, 255, 255, ${ripple.opacity})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            // Draw Double Jump Mandala (VFX)
+            if (player.mandala.active) {
+                ctx.strokeStyle = `rgba(255, 215, 0, ${player.mandala.opacity})`; // Gold color
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(player.x + player.width / 2, player.y + player.height, player.mandala.size, 0, Math.PI * 2);
+                ctx.stroke();
+                // Add a second, slightly smaller circle for more mandala-like effect
+                ctx.beginPath();
+                ctx.arc(player.x + player.width / 2, player.y + player.height, player.mandala.size * 0.7, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Draw Player
+            ctx.fillStyle = '#4f46e5'; // Indigo for player
+            if (player.isCrouching) {
+                ctx.fillStyle = '#3730a3'; // Darker indigo when crouching
+            } else if (player.isRunning) { // New condition for running
+                ctx.fillStyle = '#ff8c00'; // Orange-ish for running (distinct from indigo)
+            }
+            if (player.isClimbing || player.isGrabbingLedge) {
+                ctx.fillStyle = '#1e3a8a'; // Even darker blue when climbing
+            }
+
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw Hands Glow (VFX for climbing)
+            if (player.handsGlow) {
+                const glowColor = 'rgba(255, 255, 0, 0.7)'; // Yellow glow
+                const glowSize = 5;
+                // Left hand glow
+                ctx.fillStyle = glowColor;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y + player.height / 4, glowSize, 0, Math.PI * 2);
+                ctx.fill();
+                // Right hand glow
+                ctx.beginPath();
+                ctx.arc(player.x + player.width, player.y + player.height / 4, glowSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Game Loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game loop when the window loads
+        window.onload = function () {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>

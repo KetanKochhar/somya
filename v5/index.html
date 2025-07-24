@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sacred Journey: Mario-like Level with Lives</title>
+    <!-- Tailwind CSS for general page styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Custom CSS for the game and overall layout */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll */
+            padding: 20px; /* Add some padding for smaller screens */
+            box-sizing: border-box;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+            max-width: 900px; /* Max width for the container */
+            width: 100%;
+        }
+        canvas {
+            background-color: #a7d9f2; /* Sky blue for background */
+            border: 4px solid #6b7280; /* Gray border */
+            border-radius: 12px;
+            display: block;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            touch-action: none; /* Disable default touch actions like scrolling/zooming */
+            width: 100%; /* Make canvas responsive within its container */
+            max-width: 800px; /* Max width for the canvas */
+            height: auto; /* Maintain aspect ratio */
+            aspect-ratio: 4 / 3; /* Example aspect ratio */
+        }
+        .controls-info {
+            background-color: #f8fafc;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            color: #334155;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 700px;
+        }
+        .controls-info kbd {
+            display: inline-block;
+            padding: 3px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background-color: #f1f5f9;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #475569;
+            margin: 0 2px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 700px;
+        }
+        .game-button {
+            background-color: #4f46e5; /* Indigo */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 100px;
+        }
+        .game-button:hover {
+            background-color: #4338ca; /* Darker indigo */
+            transform: translateY(-2px);
+        }
+        .game-button:active {
+            background-color: #3730a3; /* Even darker indigo */
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .game-button.disabled {
+            background-color: #9ca3af; /* Gray */
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Basic message box styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.2rem;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .message-box.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Score and Lives display */
+        .game-stats {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 10px;
+            padding: 5px 15px;
+            background-color: #e2e8f0;
+            border-radius: 8px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        /* Game Over Screen */
+        .game-over-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        .game-over-screen.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .game-over-screen h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        .game-over-screen button {
+            background-color: #ef4444; /* Red */
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            border: none;
+            outline: none;
+        }
+        .game-over-screen button:hover {
+            background-color: #dc2626; /* Darker red */
+            transform: translateY(-3px);
+        }
+        .game-over-screen button:active {
+            background-color: #b91c1c; /* Even darker red */
+            transform: translateY(0);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Sacred Journey: Mario-like Level</h1>
+        <div class="game-stats">
+            <div>Relics: <span id="relicCount">0</span> / <span id="totalRelics">0</span></div>
+            <div>Lives: <span id="livesCount">3</span></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls-info">
+            <p>Use <kbd>A</kbd> / <kbd>D</kbd> or <kbd>←</kbd> / <kbd>→</kbd> to Walk/Run (<kbd>Shift</kbd> for Run).</p>
+            <p>Press <kbd>Space</kbd> to Jump. Double Jump unlocks after first jump.</p>
+            <p>Hold <kbd>S</kbd> or <kbd>↓</kbd> to Crouch/Crawl.</p>
+            <p>Move towards ladders/ledges to Climb/Grab. Use <kbd>W</kbd> / <kbd>↑</kbd> to climb up.</p>
+            <p>Push <kbd>P</kbd> to push blocks.</p>
+        </div>
+        <div class="button-group">
+            <button id="leftBtn" class="game-button">← Walk</button>
+            <button id="rightBtn" class="game-button">Walk →</button>
+            <button id="jumpBtn" class="game-button">Jump</button>
+            <button id="crouchBtn" class="game-button">Crouch</button>
+            <button id="pushBtn" class="game-button">Push</button>
+        </div>
+    </div>
+
+    <!-- Message Box for alerts -->
+    <div id="messageBox" class="message-box"></div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="game-over-screen">
+        <h2>GAME OVER</h2>
+        <button id="restartButton">Restart Level</button>
+    </div>
+
+    <script>
+        // Get canvas and its 2D rendering context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('messageBox');
+        const relicCountDisplay = document.getElementById('relicCount');
+        const totalRelicsDisplay = document.getElementById('totalRelics');
+        const livesCountDisplay = document.getElementById('livesCount');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const restartButton = document.getElementById('restartButton');
+
+        // Game Constants
+        const GRAVITY = 0.5;
+        const WALK_SPEED = 3;
+        const RUN_SPEED = 6;
+        const JUMP_STRENGTH = -10;
+        const LADDER_SPEED = 3;
+        const PLAYER_WIDTH = 40;
+        const PLAYER_HEIGHT = 80;
+        const CROUCH_HEIGHT = 40; // Height when crouching
+        const LEDGE_CLIMB_SPEED = 5; // Speed for ledge climbing animation
+        const PUSH_SPEED = 1.5; // Speed for pushing blocks
+
+        // World Dimensions
+        const WORLD_WIDTH = 3500; // Increased total width for a longer level
+        const WORLD_HEIGHT = 600; // Fixed height for a horizontal side-scroller
+
+        // Player Object
+        const player = {
+            x: 50, // Absolute world X
+            y: WORLD_HEIGHT - PLAYER_HEIGHT - 50, // Absolute world Y
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT,
+            dx: 0, // Horizontal velocity
+            dy: 0, // Vertical velocity
+            onGround: false,
+            jumpCount: 0, // Tracks number of jumps in current airtime
+            canDoubleJump: false, // Becomes true after the first jump
+            isCrouching: false,
+            isClimbing: false,
+            isGrabbingLedge: false,
+            isWalking: false,
+            isRunning: false,
+            isPushing: false,
+            direction: 1, // 1 for right, -1 for left
+            afterImages: [], // Stores past positions for running trail VFX
+            footRipples: [], // Stores ripple objects for walking VFX
+            mandala: { active: false, opacity: 0, size: 0 }, // For double jump VFX
+            handsGlow: false, // For climbing VFX
+            climbTargetY: null, // For smooth ledge climbing animation
+            currentLadder: null, // Reference to the ladder player is on
+            climbProgress: 0, // For smooth ledge grab animation
+            relicsCollected: 0,
+            lives: 3, // Initial lives
+            checkpoint: { x: 50, y: WORLD_HEIGHT - PLAYER_HEIGHT - 50 } // Initial checkpoint
+        };
+
+        // Camera Object
+        const camera = {
+            x: 0,
+            y: 0,
+            width: 0, // Will be set to canvas.width
+            height: 0 // Will be set to canvas.height
+        };
+
+        // Game State
+        let gameOver = false;
+
+        // Level Elements (initialized based on WORLD size)
+        let platforms = [];
+        let ladders = [];
+        let crawlSpaces = [];
+        let ledges = [];
+        let movingPlatforms = [];
+        let relics = [];
+        let spikes = [];
+        let checkpoints = [];
+        let oneWayPlatforms = [];
+        let pushableBlocks = [];
+
+        // Function to initialize/re-initialize level elements based on WORLD size
+        const initLevelElements = () => {
+            // Clear existing elements
+            platforms = [];
+            ladders = [];
+            crawlSpaces = [];
+            ledges = [];
+            movingPlatforms = [];
+            relics = [];
+            spikes = [];
+            checkpoints = [];
+            oneWayPlatforms = [];
+            pushableBlocks = [];
+
+            // --- Level Design (Absolute World Coordinates) ---
+
+            // Ground platform (extends across the entire world)
+            platforms.push({ x: 0, y: WORLD_HEIGHT - 50, width: WORLD_WIDTH, height: 50, type: 'ground' });
+
+            // Section 1: Introduction & Basic Platforming
+            platforms.push({ x: 100, y: WORLD_HEIGHT - 150, width: 150, height: 20, type: 'platform' });
+            ladders.push({ x: 200, y: WORLD_HEIGHT - 150, width: 30, height: 100 });
+            relics.push({ x: 175, y: WORLD_HEIGHT - 180, radius: 10, collected: false });
+            checkpoints.push({ x: 300, y: WORLD_HEIGHT - 100, radius: 15, active: false });
+
+            // Section 2: Gap Jump & Push Block Puzzle
+            spikes.push({ x: 450, y: WORLD_HEIGHT - 60, width: 100, height: 10 }); // Gap 1
+            pushableBlocks.push({ x: 580, y: WORLD_HEIGHT - 110, width: 60, height: 60 }); // Block to push over spikes
+            relics.push({ x: 500, y: WORLD_HEIGHT - 180, radius: 10, collected: false });
+            platforms.push({ x: 650, y: WORLD_HEIGHT - 150, width: 100, height: 20, type: 'platform' }); // Landing platform
+
+            // Section 3: Moving Platforms & Vertical Ascent
+            movingPlatforms.push({
+                x: 800, y: WORLD_HEIGHT - 150, width: 80, height: 20,
+                startX: 800, endX: 1000, speed: 1, direction: 1
+            });
+            platforms.push({ x: 1050, y: WORLD_HEIGHT - 250, width: 200, height: 20, type: 'platform' }); // Platform after moving
+            ladders.push({ x: 1100, y: WORLD_HEIGHT - 250, width: 30, height: 150 });
+            ledges.push({ x: 1250, y: WORLD_HEIGHT - 270, width: 10, height: 40, climbHeight: PLAYER_HEIGHT }); // Ledge to climb
+            relics.push({ x: 900, y: WORLD_HEIGHT - 200, radius: 10, collected: false }); // Above moving platform
+            relics.push({ x: 1200, y: WORLD_HEIGHT - 280, radius: 10, collected: false });
+            checkpoints.push({ x: 1300, y: WORLD_HEIGHT - 200, radius: 15, active: false });
+
+
+            // Section 4: Crawl Space & Hidden Path
+            platforms.push({ x: 1400, y: WORLD_HEIGHT - 200, width: 150, height: 20, type: 'platform' });
+            crawlSpaces.push({ x: 1420, y: WORLD_HEIGHT - 200, width: 100, height: 50, entranceHeight: 80 });
+            platforms.push({ x: 1420, y: WORLD_HEIGHT - 200, width: 100, height: 20, type: 'ceiling' }); // Ceiling for crawl space
+            relics.push({ x: 1470, y: WORLD_HEIGHT - 170, radius: 10, collected: false }); // Inside crawl space
+
+            // Section 5: One-Way Platforms & Precision Jumping
+            platforms.push({ x: 1600, y: WORLD_HEIGHT - 150, width: 100, height: 20, type: 'platform' });
+            oneWayPlatforms.push({ x: 1650, y: WORLD_HEIGHT - 250, width: 80, height: 10 });
+            platforms.push({ x: 1750, y: WORLD_HEIGHT - 350, width: 150, height: 20, type: 'platform' });
+            relics.push({ x: 1800, y: WORLD_HEIGHT - 380, radius: 10, collected: false });
+            checkpoints.push({ x: 1900, y: WORLD_HEIGHT - 100, radius: 15, active: false });
+
+            // Section 6: More Moving Platforms and Spikes
+            movingPlatforms.push({
+                x: 2000, y: WORLD_HEIGHT - 150, width: 80, height: 20,
+                startX: 2000, endX: 2200, speed: 1.2, direction: 1
+            });
+            platforms.push({ x: 2300, y: WORLD_HEIGHT - 100, width: 150, height: 20, type: 'platform' });
+            spikes.push({ x: 2350, y: WORLD_HEIGHT - 60, width: 80, height: 10 });
+
+            // Section 7: Final Ascent and Relic
+            platforms.push({ x: 2500, y: WORLD_HEIGHT - 200, width: 100, height: 20, type: 'platform' });
+            ladders.push({ x: 2550, y: WORLD_HEIGHT - 200, width: 30, height: 150 });
+            platforms.push({ x: 2650, y: WORLD_HEIGHT - 300, width: 150, height: 20, type: 'platform' });
+            relics.push({ x: 2725, y: WORLD_HEIGHT - 330, radius: 10, collected: false }); // Final relic
+
+            // End of level / Goal (optional, for future expansion)
+            platforms.push({ x: WORLD_WIDTH - 150, y: WORLD_HEIGHT - 50, width: 150, height: 50, type: 'ground' });
+
+
+            // Set total relics display
+            totalRelicsDisplay.textContent = relics.length;
+            player.relicsCollected = 0; // Reset collected count on level re-init
+            relicCountDisplay.textContent = player.relicsCollected;
+            livesCountDisplay.textContent = player.lives; // Update lives display
+        };
+
+        // Set canvas size dynamically and on resize
+        const setCanvasSize = () => {
+            // Set a maximum width for the canvas to maintain readability and performance
+            const maxWidth = 800;
+            const maxHeight = 600;
+            
+            // Calculate current available width and height for the canvas
+            const containerWidth = canvas.parentElement.clientWidth - 40; // Account for container padding
+            const containerHeight = canvas.parentElement.clientHeight - 100; // Estimate space for controls
+
+            // Determine actual canvas width and height, respecting max values and aspect ratio
+            let newWidth = Math.min(containerWidth, maxWidth);
+            let newHeight = (newWidth / 4) * 3; // Maintain 4:3 aspect ratio
+
+            if (newHeight > maxHeight) {
+                newHeight = maxHeight;
+                newWidth = (newHeight / 3) * 4;
+            }
+
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+
+            // Set camera dimensions
+            camera.width = newWidth;
+            camera.height = newHeight;
+
+            // Re-initialize level elements (their positions are absolute, not relative to canvas size)
+            initLevelElements();
+        };
+
+        // Initialize canvas and level elements on load
+        setCanvasSize();
+        window.addEventListener('resize', setCanvasSize);
+
+        // Input State
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            // Prevent default scroll behavior for spacebar and arrow keys
+            if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+            }
+            startAudioContext(); // Start audio context on first key press
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+            // Stop cloth/bell sounds when crouch key is released
+            if (e.key === 's' || e.key === 'ArrowDown') {
+                clothSound.triggerRelease();
+                smallBellSound.triggerRelease();
+            }
+            // Stop pushing when push key is released
+            if (e.key === 'p') {
+                player.isPushing = false;
+            }
+        });
+
+        // Touch Controls
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const jumpBtn = document.getElementById('jumpBtn');
+        const crouchBtn = document.getElementById('crouchBtn');
+        const pushBtn = document.getElementById('pushBtn');
+
+        const setupButtonListeners = (button, keyName) => {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keys[keyName] = true;
+                startAudioContext(); // Start audio context on first touch
+            }, { passive: false });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+                if (keyName === 's' || keyName === 'ArrowDown') {
+                    clothSound.triggerRelease();
+                    smallBellSound.triggerRelease();
+                }
+                if (keyName === 'p') {
+                    player.isPushing = false;
+                }
+            }, { passive: false });
+        };
+
+        setupButtonListeners(leftBtn, 'a');
+        setupButtonListeners(rightBtn, 'd');
+        setupButtonListeners(jumpBtn, ' ');
+        setupButtonListeners(crouchBtn, 's');
+        setupButtonListeners(pushBtn, 'p');
+
+        // Restart Button Listener
+        restartButton.addEventListener('click', () => {
+            resetGame();
+        });
+
+
+        // --- Sound Effects (Tone.js) ---
+        let audioContextStarted = false;
+        const startAudioContext = () => {
+            if (!audioContextStarted) {
+                Tone.start().then(() => {
+                    audioContextStarted = true;
+                    console.log('AudioContext started');
+                }).catch(e => {
+                    console.error('Failed to start AudioContext:', e);
+                    showMessage('Audio failed to start. Please allow audio playback.', 3000);
+                });
+            }
+        };
+
+        // Wind Chime (Jump Take-off)
+        const windChimeSynth = new Tone.PolySynth(Tone.Synth, {
+            voice: {
+                oscillator: { type: "sine" },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.5,
+                    sustain: 0.0,
+                    release: 0.5,
+                },
+            }
+        }).toDestination();
+
+        // Prayer Bell (Landing)
+        const prayerBellSynth = new Tone.MetalSynth({
+            frequency: 100,
+            envelope: {
+                attack: 0.001,
+                decay: 0.4,
+                release: 0.1
+            },
+            harmonicity: 5.1,
+            modulationIndex: 32,
+            resonance: 4000,
+            octaves: 1.5
+        }).toDestination();
+
+        // Cloth Sound (Crouch/Crawl) - subtle noise
+        const clothSound = new Tone.NoiseSynth({
+            noise: { type: 'pink' },
+            envelope: {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.05,
+                release: 0.1
+            }
+        }).toDestination();
+
+        // Small Bell Sound (Crouch/Crawl) - very subtle
+        const smallBellSound = new Tone.MetalSynth({
+            frequency: 200,
+            envelope: {
+                attack: 0.001,
+                decay: 0.05,
+                release: 0.05
+            },
+            harmonicity: 3.1,
+            modulationIndex: 10,
+            resonance: 2000,
+            octaves: 0.5
+        }).toDestination();
+
+        // Relic Collection Sound (Twinkle)
+        const twinkleSynth = new Tone.PluckSynth().toDestination();
+
+        // Spike Hit Sound (Short, sharp noise)
+        const spikeHitSynth = new Tone.NoiseSynth({
+            noise: { type: 'white' },
+            envelope: {
+                attack: 0.001,
+                decay: 0.1,
+                sustain: 0,
+                release: 0.1
+            }
+        }).toDestination();
+
+        // Checkpoint Activate Sound (Chime)
+        const checkpointSynth = new Tone.Synth({
+            oscillator: { type: "triangle" },
+            envelope: {
+                attack: 0.01,
+                decay: 0.2,
+                sustain: 0,
+                release: 0.2
+            }
+        }).toDestination();
+
+        // Push Block Sound (Thud)
+        const pushSound = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 10,
+            oscillator: { type: 'sine' },
+            envelope: {
+                attack: 0.001,
+                decay: 0.4,
+                sustain: 0.01,
+                release: 0.2,
+                releaseCurve: 'exponential'
+            }
+        }).toDestination();
+
+
+        // Function to play sounds
+        const playWindChime = () => { if (audioContextStarted) windChimeSynth.triggerAttackRelease(["C4", "E4", "G4"], "8n"); };
+        const playPrayerBell = () => { if (audioContextStarted) prayerBellSynth.triggerAttackRelease("C3", "4n"); };
+        const playClothAndBell = () => {
+            if (audioContextStarted && Tone.context.state === 'running') {
+                clothSound.triggerAttackRelease("8n");
+                smallBellSound.triggerAttackRelease("C5", "16n");
+            }
+        };
+        const playTwinkle = () => { if (audioContextStarted) twinkleSynth.triggerAttackRelease("C6", "8n"); };
+        const playSpikeHit = () => { if (audioContextStarted) spikeHitSynth.triggerAttackRelease("16n"); };
+        const playCheckpoint = () => { if (audioContextStarted) checkpointSynth.triggerAttackRelease("G4", "8n"); };
+        const playPushSound = () => { if (audioContextStarted) pushSound.triggerAttackRelease("C2", "8n"); };
+
+
+        // Custom message box function
+        function showMessage(msg, duration = 2000) {
+            messageBox.textContent = msg;
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        // --- Game Logic Functions ---
+
+        function update() {
+            if (gameOver) return; // Stop updating if game is over
+
+            // Reset states
+            player.isWalking = false;
+            player.isRunning = false;
+            player.handsGlow = false; // Reset hand glow for climbing
+
+            // Handle Ledge Climbing Animation
+            if (player.climbTargetY !== null) {
+                player.isGrabbingLedge = true;
+                player.handsGlow = true;
+                if (player.y > player.climbTargetY) {
+                    player.y -= LEDGE_CLIMB_SPEED;
+                    player.dy = 0; // Stop gravity during climb animation
+                } else {
+                    player.y = player.climbTargetY;
+                    player.climbTargetY = null;
+                    player.isGrabbingLedge = false;
+                    player.onGround = true; // Landed on top of ledge
+                    player.jumpCount = 0; // Reset jump count
+                    playPrayerBell(); // Play landing sound
+                }
+                // Skip other movement logic while climbing animation is active
+                return;
+            }
+
+            // Handle Horizontal Movement
+            player.dx = 0; // Reset horizontal velocity
+            if (!player.isClimbing) { // Cannot move horizontally while climbing ladders
+                if (keys['a'] || keys['ArrowLeft']) {
+                    player.dx = -(keys['Shift'] ? RUN_SPEED : WALK_SPEED);
+                    player.direction = -1;
+                    player.isWalking = true;
+                    player.isRunning = keys['Shift'];
+                }
+                if (keys['d'] || keys['ArrowRight']) {
+                    player.dx = (keys['Shift'] ? RUN_SPEED : WALK_SPEED);
+                    player.direction = 1;
+                    player.isWalking = true;
+                    player.isRunning = keys['Shift'];
+                }
+            }
+
+            // Update after-images for running VFX
+            if (player.isRunning && player.onGround) { // Only create after-images when running on ground
+                player.afterImages.push({
+                    x: player.x,
+                    y: player.y,
+                    width: player.width,
+                    height: player.height,
+                    opacity: 0.7, // Increased initial opacity
+                    color: 'rgba(79, 70, 229, 1)' // Solid indigo color, opacity handled by 'opacity' property
+                });
+            }
+            // Limit after-images to prevent performance issues and fade them out
+            while (player.afterImages.length > 8) { // More after-images
+                player.afterImages.shift();
+            }
+            player.afterImages.forEach(img => img.opacity -= 0.015); // Slightly slower fade
+            player.afterImages = player.afterImages.filter(img => img.opacity > 0);
+
+            // Update foot ripples for walking VFX
+            if (player.isWalking && player.onGround && Math.random() < 0.2) { // Random chance for ripple
+                player.footRipples.push({
+                    x: player.x + player.width / 2,
+                    y: player.y + player.height,
+                    radius: 5,
+                    opacity: 0.8,
+                    color: 'rgba(255, 255, 255, 0.8)' // Light ripple
+                });
+            }
+            player.footRipples.forEach(ripple => {
+                ripple.radius += 1;
+                ripple.opacity -= 0.03;
+            });
+            player.footRipples = player.footRipples.filter(ripple => ripple.opacity > 0 && ripple.radius < 30);
+
+
+            // Handle Crouch/Crawl
+            const targetHeight = (keys['s'] || keys['ArrowDown']) ? CROUCH_HEIGHT : PLAYER_HEIGHT;
+            player.isCrouching = (targetHeight === CROUCH_HEIGHT);
+
+            if (player.isCrouching && !player.isClimbing && (player.dx !== 0 || player.dy !== 0)) {
+                // Play subtle cloth and bell sounds only when crouching and moving
+                if (audioContextStarted && Tone.context.state === 'running' && !clothSound.context._isActive) {
+                    clothSound.triggerAttackRelease("8n");
+                    smallBellSound.triggerAttackRelease("C5", "16n");
+                }
+            } else {
+                // Stop sounds if not crouching or not moving
+                if (clothSound.context._isActive) {
+                    clothSound.triggerRelease();
+                    smallBellSound.triggerRelease();
+                }
+            }
+
+            // Smoothly adjust player height
+            if (player.height !== targetHeight) {
+                if (player.height < targetHeight) {
+                    player.height = Math.min(player.height + 5, targetHeight);
+                } else {
+                    // Check if player can stand up (no ceiling above)
+                    let canStandUp = true;
+                    for (const p of platforms) {
+                        if (player.x < p.x + p.width &&
+                            player.x + player.width > p.x &&
+                            player.y + CROUCH_HEIGHT > p.y &&
+                            player.y < p.y + p.height) {
+                            canStandUp = false;
+                            break;
+                        }
+                    }
+                    if (canStandUp) {
+                        player.height = Math.max(player.height - 5, targetHeight);
+                        // Adjust player y to keep feet on ground when standing up
+                        if (player.onGround) player.y -= (PLAYER_HEIGHT - player.height);
+                    } else {
+                        player.isCrouching = true; // Force crouch if cannot stand
+                        player.height = CROUCH_HEIGHT;
+                    }
+                }
+            }
+
+            // Handle Climbing
+            let onLadder = false;
+            for (const ladder of ladders) {
+                if (player.x + player.width > ladder.x &&
+                    player.x < ladder.x + ladder.width &&
+                    player.y + player.height > ladder.y &&
+                    player.y < ladder.y + ladder.height) {
+                    onLadder = true;
+                    player.currentLadder = ladder;
+                    break;
+                }
+            }
+
+            if (onLadder && (keys['w'] || keys['ArrowUp'] || keys['s'] || keys['ArrowDown'])) {
+                player.isClimbing = true;
+                player.onGround = false; // Can't be on ground while climbing
+                player.dy = 0; // No gravity while climbing
+                player.dx = 0; // No horizontal movement while climbing
+                player.handsGlow = true; // Hands glow when climbing
+
+                if (keys['w'] || keys['ArrowUp']) {
+                    player.y -= LADDER_SPEED;
+                }
+                if (keys['s'] || keys['ArrowDown']) {
+                    player.y += LADDER_SPEED;
+                }
+                // Keep player centered on ladder (optional, but good for feel)
+                player.x = player.currentLadder.x + (player.currentLadder.width / 2) - (player.width / 2);
+
+            } else {
+                player.isClimbing = false;
+                player.currentLadder = null;
+            }
+
+            // Apply Gravity if not climbing or grabbing ledge
+            if (!player.isClimbing && !player.isGrabbingLedge) {
+                player.dy += GRAVITY;
+            }
+
+            // Handle Jump
+            if ((keys[' '] || jumpBtn.classList.contains('active')) && !player.isGrabbingLedge) {
+                if (player.onGround && player.jumpCount === 0) {
+                    player.dy = JUMP_STRENGTH;
+                    player.onGround = false;
+                    player.jumpCount = 1;
+                    player.canDoubleJump = true; // Unlock double jump after first jump
+                    playWindChime(); // Soft wind chime sound
+                } else if (!player.onGround && player.jumpCount === 1 && player.canDoubleJump) {
+                    player.dy = JUMP_STRENGTH * 0.8; // Slightly weaker double jump
+                    player.jumpCount = 2;
+                    player.canDoubleJump = false; // Used double jump
+                    playWindChime(); // Soft wind chime sound
+                    // Activate mandala pattern VFX
+                    player.mandala = { active: true, opacity: 1, size: 0 };
+                }
+            }
+
+            // Update Mandala VFX
+            if (player.mandala.active) {
+                player.mandala.size += 2;
+                player.mandala.opacity -= 0.02;
+                if (player.mandala.opacity <= 0) {
+                    player.mandala.active = false;
+                    player.mandala.size = 0;
+                }
+            }
+
+            // Update player position based on velocity
+            player.x += player.dx;
+            player.y += player.dy;
+
+            // Collision Detection with Platforms
+            let wasOnGround = player.onGround;
+            player.onGround = false;
+
+            for (const p of platforms) {
+                // Check for collision with platform
+                if (player.x < p.x + p.width &&
+                    player.x + player.width > p.x &&
+                    player.y + player.height > p.y &&
+                    player.y < p.y + p.height) {
+
+                    // If falling and landed on top of a platform
+                    if (player.dy > 0 && player.y + player.height - player.dy <= p.y) {
+                        player.y = p.y - player.height;
+                        player.dy = 0;
+                        if (!wasOnGround) { // Only play sound if just landed
+                            playPrayerBell(); // Prayer bell echo at landing
+                        }
+                        player.onGround = true;
+                        player.jumpCount = 0; // Reset jump count on landing
+                    }
+                    // If hitting bottom of platform while jumping
+                    else if (player.dy < 0 && player.y >= p.y + p.height - player.dy) {
+                        player.y = p.y + p.height;
+                        player.dy = 0; // Stop upward movement
+                    }
+                }
+            }
+
+            // Collision with Moving Platforms
+            movingPlatforms.forEach(mp => {
+                // Update moving platform position
+                mp.x += mp.speed * mp.direction;
+                if (mp.x <= mp.startX || mp.x + mp.width >= mp.endX) {
+                    mp.direction *= -1; // Reverse direction
+                }
+
+                if (player.x < mp.x + mp.width &&
+                    player.x + player.width > mp.x &&
+                    player.y + player.height > mp.y &&
+                    player.y < mp.y + mp.height) {
+
+                    if (player.dy > 0 && player.y + player.height - player.dy <= mp.y) {
+                        player.y = mp.y - player.height;
+                        player.dy = 0;
+                        if (!wasOnGround) {
+                            playPrayerBell();
+                        }
+                        player.onGround = true;
+                        player.jumpCount = 0;
+                        player.x += mp.speed * mp.direction; // Move player with platform
+                    } else if (player.dy < 0 && player.y >= mp.y + mp.height - player.dy) {
+                        player.y = mp.y + mp.height;
+                        player.dy = 0;
+                    }
+                }
+            });
+
+            // Collision with One-Way Platforms
+            for (const owp of oneWayPlatforms) {
+                if (player.dy > 0 && // Only collide when falling
+                    player.y + player.height - player.dy <= owp.y && // Player was above platform
+                    player.x < owp.x + owp.width &&
+                    player.x + player.width > owp.x &&
+                    player.y + player.height > owp.y &&
+                    player.y < owp.y + owp.height) {
+
+                    player.y = owp.y - player.height;
+                    player.dy = 0;
+                    if (!wasOnGround) {
+                        playPrayerBell();
+                    }
+                    player.onGround = true;
+                    player.jumpCount = 0;
+                }
+            }
+
+
+            // Collision with Crawl Spaces
+            let inCrawlSpace = false;
+            for (const cs of crawlSpaces) {
+                if (player.x < cs.x + cs.width &&
+                    player.x + player.width > cs.x &&
+                    player.y + player.height > cs.y &&
+                    player.y < cs.y + cs.height) {
+                    inCrawlSpace = true;
+                    // If player is too tall to be in crawl space
+                    if (player.height > cs.entranceHeight) {
+                        // Force player to crouch or prevent entry
+                        if (!player.isCrouching) {
+                            // If player tries to enter without crouching, prevent movement
+                            if (player.dx > 0 && player.x + player.width > cs.x && player.x < cs.x) player.x = cs.x - player.width;
+                            if (player.dx < 0 && player.x < cs.x + cs.width && player.x + player.width > cs.x + cs.width) player.x = cs.x + cs.width;
+                        }
+                    }
+                }
+            }
+
+            // Handle Ledge Grabbing
+            let nearLedge = false;
+            for (const ledge of ledges) {
+                // Check if player is near the ledge horizontally and slightly below it vertically
+                if ((player.direction === 1 && player.x + player.width > ledge.x && player.x < ledge.x + ledge.width &&
+                     player.y + player.height > ledge.y && player.y + player.height < ledge.y + ledge.height + player.height / 2) ||
+                    (player.direction === -1 && player.x < ledge.x + ledge.width && player.x + player.width > ledge.x &&
+                     player.y + player.height > ledge.y && player.y + player.height < ledge.y + ledge.height + player.height / 2)) {
+
+                    // Check if player is jumping or falling towards the ledge
+                    if (!player.onGround && player.dy > 0) {
+                        nearLedge = true;
+                        player.isGrabbingLedge = true;
+                        player.handsGlow = true; // Hands glow faintly with relic energy
+                        player.dy = 0; // Stop vertical movement
+                        player.dx = 0; // Stop horizontal movement
+                        player.x = ledge.x + (player.direction === 1 ? -player.width : ledge.width); // Snap to ledge side
+                        player.y = ledge.y + ledge.height - player.height; // Snap player's top to ledge bottom
+
+                        // Trigger climb animation if jump/up key is pressed
+                        if (keys[' '] || keys['w'] || keys['ArrowUp']) {
+                            player.climbTargetY = ledge.y - player.height; // Target Y to stand on top of ledge
+                            player.isGrabbingLedge = false; // End grab state, start climb animation
+                        }
+                        break; // Only grab one ledge at a time
+                    }
+                }
+            }
+            if (!nearLedge && player.climbTargetY === null) {
+                player.isGrabbingLedge = false;
+            }
+
+            // Relic Collection
+            relics.forEach(relic => {
+                if (!relic.collected &&
+                    player.x < relic.x + relic.radius &&
+                    player.x + player.width > relic.x - relic.radius &&
+                    player.y < relic.y + relic.radius &&
+                    player.y + player.height > relic.y - relic.radius) {
+                    relic.collected = true;
+                    player.relicsCollected++;
+                    relicCountDisplay.textContent = player.relicsCollected;
+                    playTwinkle();
+                    showMessage(`Relic Collected! (${player.relicsCollected}/${relics.length})`);
+                }
+            });
+
+            // Spike Collision
+            spikes.forEach(spike => {
+                if (player.x < spike.x + spike.width &&
+                    player.x + player.width > spike.x &&
+                    player.y + player.height > spike.y &&
+                    player.y < spike.y + spike.height) {
+                    playSpikeHit();
+                    loseLife(); // Player loses a life
+                }
+            });
+
+            // Checkpoint Activation
+            checkpoints.forEach(cp => {
+                if (!cp.active &&
+                    player.x < cp.x + cp.radius &&
+                    player.x + player.width > cp.x - cp.radius &&
+                    player.y + player.height > cp.y - cp.radius &&
+                    player.y < cp.y + cp.radius) {
+                    cp.active = true;
+                    player.checkpoint.x = player.x;
+                    player.checkpoint.y = player.y;
+                    playCheckpoint();
+                    showMessage("Checkpoint Reached!", 1500);
+                }
+            });
+
+            // Pushable Block Logic
+            player.isPushing = false;
+            if (keys['p'] || pushBtn.classList.contains('active')) {
+                for (const block of pushableBlocks) {
+                    // Check if player is next to the block and on the ground
+                    const isNextToBlock = (
+                        (player.direction === 1 && player.x + player.width >= block.x - 5 && player.x + player.width < block.x + block.width / 2) ||
+                        (player.direction === -1 && player.x <= block.x + block.width + 5 && player.x > block.x + block.width / 2)
+                    ) && (
+                        player.y + player.height > block.y && player.y < block.y + block.height
+                    );
+
+                    if (isNextToBlock && player.onGround) {
+                        player.isPushing = true;
+                        const pushAmount = PUSH_SPEED * player.direction;
+                        let canPush = true;
+
+                        // Check for collisions with other platforms/blocks when pushing
+                        for (const p of platforms) {
+                            if (p !== block &&
+                                block.x + block.width + pushAmount > p.x &&
+                                block.x + pushAmount < p.x + p.width &&
+                                block.y < p.y + p.height &&
+                                block.y + block.height > p.y) {
+                                canPush = false;
+                                break;
+                            }
+                        }
+                        for (const otherBlock of pushableBlocks) {
+                            if (otherBlock !== block &&
+                                block.x + block.width + pushAmount > otherBlock.x &&
+                                block.x + pushAmount < otherBlock.x + otherBlock.width &&
+                                block.y < otherBlock.y + otherBlock.height &&
+                                block.y + block.height > otherBlock.y) {
+                                canPush = false;
+                                break;
+                            }
+                        }
+
+                        if (canPush) {
+                            block.x += pushAmount;
+                            player.x += pushAmount; // Move player with the block
+                            playPushSound();
+                        } else {
+                            showMessage("Cannot push further!", 500);
+                        }
+                        break; // Only push one block at a time
+                    }
+                }
+            }
+
+
+            // Boundary Checks for Player in World
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > WORLD_WIDTH) player.x = WORLD_WIDTH - player.width;
+            if (player.y < 0) {
+                player.y = 0;
+                player.dy = 0; // Prevent going through the top
+            }
+            // Player falls off the bottom of the world
+            if (player.y > WORLD_HEIGHT + 50) { // Give a small buffer before losing a life
+                loseLife();
+            }
+            // Player should not fall below ground (handled by platform collision, but as a fallback)
+            else if (player.y + player.height > WORLD_HEIGHT) {
+                player.y = WORLD_HEIGHT - player.height;
+                player.dy = 0;
+                if (!player.onGround) {
+                    playPrayerBell();
+                }
+                player.onGround = true;
+                player.jumpCount = 0;
+            }
+
+            // Update Camera Position
+            camera.x = player.x - camera.width / 2;
+            // Clamp camera.x to world boundaries
+            if (camera.x < 0) {
+                camera.x = 0;
+            }
+            if (camera.x + camera.width > WORLD_WIDTH - camera.width) {
+                camera.x = WORLD_WIDTH - camera.width;
+            }
+            camera.y = 0; // Keeping vertical camera fixed for now
+        }
+
+        function loseLife() {
+            player.lives--;
+            livesCountDisplay.textContent = player.lives;
+            if (player.lives <= 0) {
+                gameOver = true;
+                gameOverScreen.classList.add('show');
+                showMessage("Game Over!", 0); // Show indefinitely
+            } else {
+                respawnPlayer();
+                showMessage(`Life Lost! Lives remaining: ${player.lives}`, 2000);
+            }
+        }
+
+        function respawnPlayer() {
+            player.x = player.checkpoint.x;
+            player.y = player.checkpoint.y;
+            player.dx = 0;
+            player.dy = 0;
+            player.onGround = true;
+            player.jumpCount = 0;
+            player.isCrouching = false;
+            player.isClimbing = false;
+            player.isGrabbingLedge = false;
+            player.height = PLAYER_HEIGHT;
+        }
+
+        function resetGame() {
+            gameOver = false;
+            gameOverScreen.classList.remove('show');
+            player.lives = 3; // Reset lives
+            player.relicsCollected = 0; // Reset relics
+            player.checkpoint = { x: 50, y: WORLD_HEIGHT - PLAYER_HEIGHT - 50 }; // Reset checkpoint
+            initLevelElements(); // Re-initialize all level elements (resets collected relics, moving platform positions, etc.)
+            respawnPlayer(); // Place player at the very start
+            showMessage("Game Restarted!", 1500);
+        }
+
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            // Draw Level Elements (offset by camera)
+            ctx.fillStyle = '#6c7a89'; // Darker blue-gray for platforms
+            platforms.forEach(p => {
+                ctx.fillRect(p.x - camera.x, p.y - camera.y, p.width, p.height);
+                // Add subtle platform texture/detail
+                ctx.strokeStyle = '#5a6470';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(p.x - camera.x, p.y - camera.y, p.width, p.height);
+            });
+
+            ctx.fillStyle = '#aab8c2'; // Light gray for ladder
+            ladders.forEach(l => {
+                ctx.fillRect(l.x - camera.x, l.y - camera.y, l.width, l.height);
+                // Draw ladder rungs
+                ctx.strokeStyle = '#8899a6';
+                ctx.lineWidth = 2;
+                const rungSpacing = 20;
+                for (let y = l.y + rungSpacing; y < l.y + l.height - rungSpacing / 2; y += rungSpacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(l.x + 5 - camera.x, y - camera.y);
+                    ctx.lineTo(l.x + l.width - 5 - camera.x, y - camera.y);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.fillStyle = '#8899a6'; // Gray for crawl space
+            crawlSpaces.forEach(cs => {
+                ctx.fillRect(cs.x - camera.x, cs.y + cs.entranceHeight - camera.y, cs.width, cs.height - cs.entranceHeight); // Draw the solid part
+                ctx.strokeStyle = '#6c7a89';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cs.x - camera.x, cs.y - camera.y, cs.width, cs.height); // Outline the whole area
+                ctx.fillStyle = '#334155';
+                ctx.font = '12px Inter';
+                ctx.fillText("Crawl", cs.x + cs.width / 2 - 15 - camera.x, cs.y + cs.entranceHeight / 2 - camera.y); // Text hint
+            });
+
+            ctx.fillStyle = '#6c7a89'; // Darker blue-gray for ledges
+            ledges.forEach(l => {
+                ctx.fillRect(l.x - camera.x, l.y - camera.y, l.width, l.height);
+            });
+
+            // Draw Moving Platforms (offset by camera)
+            ctx.fillStyle = '#4a5568'; // Darker gray for moving platforms
+            movingPlatforms.forEach(mp => {
+                ctx.fillRect(mp.x - camera.x, mp.y - camera.y, mp.width, mp.height);
+                ctx.strokeStyle = '#333a47';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(mp.x - camera.x, mp.y - camera.y, mp.width, mp.height);
+                // Add small arrows to indicate movement
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(mp.x + mp.width / 2 - 5 - camera.x, mp.y + mp.height / 2 - 5 - camera.y);
+                ctx.lineTo(mp.x + mp.width / 2 + 5 - camera.x, mp.y + mp.height / 2 - camera.y);
+                ctx.lineTo(mp.x + mp.width / 2 - 5 - camera.x, mp.y + mp.height / 2 + 5 - camera.y);
+                ctx.fill();
+            });
+
+            // Draw Relics (sparkling effect) (offset by camera)
+            relics.forEach(relic => {
+                if (!relic.collected) {
+                    const sparkle = Math.sin(Date.now() * 0.005) * 0.2 + 0.8; // Pulsating effect
+                    ctx.fillStyle = `rgba(255, 215, 0, ${sparkle})`; // Gold color with pulsating opacity
+                    ctx.beginPath();
+                    ctx.arc(relic.x - camera.x, relic.y - camera.y, relic.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Inner sparkle
+                    ctx.fillStyle = `rgba(255, 255, 255, ${sparkle * 0.5})`;
+                    ctx.beginPath();
+                    ctx.arc(relic.x - camera.x, relic.y - camera.y, relic.radius * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Draw Spikes (offset by camera)
+            ctx.fillStyle = '#dc2626'; // Red for spikes
+            spikes.forEach(spike => {
+                ctx.beginPath();
+                ctx.moveTo(spike.x - camera.x, spike.y + spike.height - camera.y);
+                ctx.lineTo(spike.x + spike.width / 2 - camera.x, spike.y - camera.y);
+                ctx.lineTo(spike.x + spike.width - camera.x, spike.y + spike.height - camera.y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#991b1b';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+
+            // Draw Checkpoints (offset by camera)
+            checkpoints.forEach(cp => {
+                ctx.fillStyle = cp.active ? '#10b981' : '#6b7280'; // Green if active, gray if not
+                ctx.beginPath();
+                ctx.arc(cp.x - camera.x, cp.y - camera.y, cp.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = cp.active ? '#059669' : '#4b5563';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // Add a small flag pole
+                ctx.fillRect(cp.x - 2 - camera.x, cp.y - cp.radius - 20 - camera.y, 4, 20);
+                if (cp.active) {
+                    ctx.fillStyle = '#ecfdf5';
+                    ctx.beginPath();
+                    ctx.moveTo(cp.x + 2 - camera.x, cp.y - cp.radius - 20 - camera.y);
+                    ctx.lineTo(cp.x + 20 - camera.x, cp.y - cp.radius - 15 - camera.y);
+                    ctx.lineTo(cp.x + 2 - camera.x, cp.y - cp.radius - 10 - camera.y);
+                    ctx.fill();
+                }
+            });
+
+            // Draw One-Way Platforms (offset by camera)
+            ctx.fillStyle = '#81e6d9'; // Light teal for one-way platforms
+            oneWayPlatforms.forEach(owp => {
+                ctx.fillRect(owp.x - camera.x, owp.y - camera.y, owp.width, owp.height);
+                ctx.strokeStyle = '#4fd1c5';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(owp.x - camera.x, owp.y - camera.y, owp.width, owp.height);
+                // Add small upward arrows
+                ctx.fillStyle = '#ffffff';
+                const arrowSize = 5;
+                for (let i = 0; i < owp.width; i += 20) {
+                    ctx.beginPath();
+                    ctx.moveTo(owp.x + i + arrowSize - camera.x, owp.y + owp.height - arrowSize - camera.y);
+                    ctx.lineTo(owp.x + i + arrowSize - camera.x, owp.y + arrowSize - camera.y);
+                    ctx.lineTo(owp.x + i - camera.x, owp.y + arrowSize + 5 - camera.y);
+                    ctx.moveTo(owp.x + i + arrowSize - camera.x, owp.y + arrowSize - camera.y);
+                    ctx.lineTo(owp.x + i + arrowSize * 2 - camera.x, owp.y + arrowSize + 5 - camera.y);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw Pushable Blocks (offset by camera)
+            ctx.fillStyle = '#78350f'; // Brown for blocks
+            pushableBlocks.forEach(block => {
+                ctx.fillRect(block.x - camera.x, block.y - camera.y, block.width, block.height);
+                ctx.strokeStyle = '#451a03';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(block.x - camera.x, block.y - camera.y, block.width, block.height);
+                // Add wood grain texture
+                ctx.beginPath();
+                ctx.moveTo(block.x + block.width * 0.2 - camera.x, block.y + block.height * 0.3 - camera.y);
+                ctx.lineTo(block.x + block.width * 0.8 - camera.x, block.y + block.height * 0.3 - camera.y);
+                ctx.moveTo(block.x + block.width * 0.1 - camera.x, block.y + block.height * 0.6 - camera.y);
+                ctx.lineTo(block.x + block.width * 0.9 - camera.x, block.y + block.height * 0.6 - camera.y);
+                ctx.strokeStyle = '#a16207';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+
+
+            // Draw Running After-images (VFX) (offset by camera)
+            player.afterImages.forEach(img => {
+                ctx.fillStyle = `rgba(79, 70, 229, ${img.opacity})`; // Faint indigo
+                ctx.fillRect(img.x - camera.x, img.y - camera.y, img.width, img.height);
+            });
+
+            // Draw Walking Foot Ripples (VFX) (offset by camera)
+            player.footRipples.forEach(ripple => {
+                ctx.strokeStyle = `rgba(255, 255, 255, ${ripple.opacity})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(ripple.x - camera.x, ripple.y - camera.y, ripple.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            // Draw Double Jump Mandala (VFX) (offset by camera)
+            if (player.mandala.active) {
+                ctx.strokeStyle = `rgba(255, 215, 0, ${player.mandala.opacity})`; // Gold color
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(player.x + player.width / 2 - camera.x, player.y + player.height - camera.y, player.mandala.size, 0, Math.PI * 2);
+                ctx.stroke();
+                // Add a second, slightly smaller circle for more mandala-like effect
+                ctx.beginPath();
+                ctx.arc(player.x + player.width / 2 - camera.x, player.y + player.height - camera.y, player.mandala.size * 0.7, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Draw Player (offset by camera)
+            ctx.fillStyle = '#4f46e5'; // Indigo for player
+            if (player.isCrouching) {
+                ctx.fillStyle = '#3730a3'; // Darker indigo when crouching
+            } else if (player.isRunning) { // New condition for running
+                ctx.fillStyle = '#ff8c00'; // Orange-ish for running (distinct from indigo)
+            }
+            if (player.isClimbing || player.isGrabbingLedge) {
+                ctx.fillStyle = '#1e3a8a'; // Even darker blue when climbing
+            }
+            if (player.isPushing) {
+                ctx.fillStyle = '#8b5cf6'; // Lighter purple when pushing
+            }
+
+            ctx.fillRect(player.x - camera.x, player.y - camera.y, player.width, player.height);
+
+            // Draw Hands Glow (VFX for climbing) (offset by camera)
+            if (player.handsGlow) {
+                const glowColor = 'rgba(255, 255, 0, 0.7)'; // Yellow glow
+                const glowSize = 5;
+                // Left hand glow
+                ctx.fillStyle = glowColor;
+                ctx.beginPath();
+                ctx.arc(player.x - camera.x, player.y + player.height / 4 - camera.y, glowSize, 0, Math.PI * 2);
+                ctx.fill();
+                // Right hand glow
+                ctx.beginPath();
+                ctx.arc(player.x + player.width - camera.x, player.y + player.height / 4 - camera.y, glowSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Game Loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game loop when the window loads
+        window.onload = function () {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>

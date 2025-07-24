@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Character Jump and Slide</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to top, #8be18b, #c2f0f7); /* garden-like gradient */
+    }
+
+    .clouds {
+      position: absolute;
+      top: 30px;
+      width: 100%;
+      height: 100px;
+      background: url('clouds.png') repeat-x;
+      background-size: contain;
+      z-index: 1;
+      opacity: 0.6;
+    }
+
+    .character {
+      position: absolute;
+      bottom: 50px;
+      left: 100px;
+      width: 80px;
+      height: 80px;
+      z-index: 2;
+      transition: bottom 0.3s ease;
+    }
+
+    .character.jump {
+      animation: jump 0.6s ease-out forwards;
+    }
+
+    @keyframes jump {
+      0% { bottom: 50px; }
+      50% { bottom: 200px; }
+      100% { bottom: 50px; }
+    }
+
+    .character.slide img {
+      height: 40px;
+    }
+
+    .obstacle {
+      position: absolute;
+      bottom: 50px;
+      right: 200px;
+      width: 60px;
+      height: 60px;
+      background-color: red;
+      z-index: 2;
+    }
+
+    .character img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div class="clouds"></div>
+    <div class="character" id="character">
+      <img id="char-img" src="character-idle.png" alt="Character" />
+    </div>
+    <div class="obstacle"></div>
+  </div>
+
+  <script>
+    const character = document.getElementById('character');
+    const charImg = document.getElementById('char-img');
+
+    function jump() {
+      if (!character.classList.contains('jump') && !character.classList.contains('slide')) {
+        character.classList.add('jump');
+        charImg.src = 'character-jump.png'; // your jump image
+        setTimeout(() => {
+          character.classList.remove('jump');
+          charImg.src = 'character-idle.png';
+        }, 600);
+      }
+    }
+
+    function slide() {
+      if (!character.classList.contains('slide') && !character.classList.contains('jump')) {
+        character.classList.add('slide');
+        charImg.src = 'character-slide.png'; // your slide image
+        setTimeout(() => {
+          character.classList.remove('slide');
+          charImg.src = 'character-idle.png';
+        }, 1000);
+      }
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        jump();
+      } else if (e.code === 'ArrowDown') {
+        slide();
+      }
+    });
+
+    // Click/tap to jump
+    document.addEventListener('click', jump);
+
+    // Long press to slide
+    let pressTimer;
+    document.addEventListener('touchstart', () => {
+      pressTimer = setTimeout(slide, 500);
+    });
+
+    document.addEventListener('touchend', () => {
+      clearTimeout(pressTimer);
+    });
+  </script>
+</body>
+</html>
